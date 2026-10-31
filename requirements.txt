@@ -1,3 +1,5 @@
 mutagen>=1.47.0
 pygame>=2.5.0
 pillow>=9.0.0
+kivy[base]>=2.3.0
+kivymd>=2.0.0

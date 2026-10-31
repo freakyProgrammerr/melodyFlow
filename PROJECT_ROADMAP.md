@@ -43,9 +43,11 @@ A personalized music player app built with **Python**, designed specifically for
 - [x] Test the engine on PC with real/sample music files.
 
 ### Stage 2: The Mobile UI (Visual Interface)
-- [ ] Create modern, touch-friendly UI screens (Library, Albums, Singles, Search).
-- [ ] Persistent bottom Mini Player (Play/Pause, Next, Track Info).
-- [ ] Fullscreen Now Playing screen with album art and seek bar.
+- [x] Create modern, touch-friendly UI screens (Library, Albums, Singles, Search) in `main.py`.
+- [x] Implement centralized, 100% customizable theme tokens in `ui_theme.py`.
+- [x] Persistent bottom Mini Player (Play/Pause, Next, Track Info, progress line) in `ui_components.py`.
+- [x] Fullscreen Now Playing modal with album art, scrubber, repeat toggle, and shuffle mode controls.
+- [x] Full integration and verification suite in `test_stage2_ui.py`.
 
 ### Stage 3: Android Integration & APK Build
 - [ ] Set up background audio service (keeps playing with screen off).

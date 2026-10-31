@@ -137,6 +137,14 @@ class MusicLibrary:
         self.singles: List[Track] = []
         self.artists: Dict[str, Artist] = {}
 
+    @property
+    def total_tracks(self) -> int:
+        return len(self.tracks)
+
+    @property
+    def all_tracks(self) -> List[Track]:
+        return self.tracks
+
     def load_from_metadata_list(self, raw_metadata_list: List[dict]) -> None:
         """Populate the library from raw scanner metadata dicts."""
         self.tracks = [Track.from_dict(meta) for meta in raw_metadata_list]

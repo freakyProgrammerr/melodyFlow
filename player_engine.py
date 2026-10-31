@@ -260,6 +260,7 @@ class PlayerEngine:
         self.repeat_mode: RepeatMode = RepeatMode.OFF
         self.playback_mode: PlaybackMode = PlaybackMode.NORMAL
         self.is_paused: bool = False
+        self.library: Optional[MusicLibrary] = None
 
         # Event callbacks
         self.on_track_change: Optional[Callable[[Optional[Track]], None]] = None
@@ -296,41 +297,69 @@ class PlayerEngine:
             if self.on_track_change:
                 self.on_track_change(None)
 
+    def play_track_directly(self, track: Track) -> None:
+        """Play a specific track directly, inserting it into queue if needed."""
+        for idx, t in enumerate(self.queue):
+            if t.id == track.id:
+                self.play_track_at_index(idx)
+                return
+
+        if self.library and self.library.all_tracks:
+            tracks = list(self.library.all_tracks)
+            start_idx = 0
+            for idx, t in enumerate(tracks):
+                if t.id == track.id:
+                    start_idx = idx
+                    break
+            self.set_queue(tracks, start_index=start_idx, auto_play=True)
+        else:
+            self.set_queue([track], start_index=0, auto_play=True)
+
     def play_album(self, album: Album, start_track_index: int = 0) -> None:
         """Play an entire album sequentially from track 1 to end."""
         self.playback_mode = PlaybackMode.PLAY_ALBUM
         album.sort_tracks()
         self.set_queue(album.tracks, start_index=start_track_index, auto_play=True)
 
-    def play_singles(self, singles: List[Track], start_index: int = 0) -> None:
+    def play_singles(self, singles: Optional[List[Track]] = None, start_index: int = 0) -> None:
         """Play singles in current list order."""
+        if singles is None and self.library:
+            singles = self.library.singles
         self.playback_mode = PlaybackMode.PLAY_SINGLES
-        self.set_queue(singles, start_index=start_index, auto_play=True)
+        self.set_queue(singles or [], start_index=start_index, auto_play=True)
 
-    def auto_play_singles_multi_artist(self, singles: List[Track]) -> None:
+    def auto_play_singles_multi_artist(self, singles: Optional[List[Track]] = None) -> None:
         """Auto-chains singles from varying artists to maximize variety."""
+        if singles is None and self.library:
+            singles = self.library.singles
         self.playback_mode = PlaybackMode.AUTO_PLAY_SINGLES_MULTI_ARTIST
-        interleaved = build_multi_artist_singles_queue(singles)
+        interleaved = build_multi_artist_singles_queue(singles or [])
         self.set_queue(interleaved, start_index=0, auto_play=True)
 
-    def shuffle_all(self, all_tracks: List[Track]) -> None:
+    def shuffle_all(self, all_tracks: Optional[List[Track]] = None) -> None:
         """Full randomized playback across the entire local music library."""
+        if all_tracks is None and self.library:
+            all_tracks = self.library.all_tracks
         self.playback_mode = PlaybackMode.SHUFFLE_ALL
-        shuffled = list(all_tracks)
+        shuffled = list(all_tracks or [])
         random.shuffle(shuffled)
         self.set_queue(shuffled, start_index=0, auto_play=True)
 
-    def shuffle_singles_only(self, singles: List[Track]) -> None:
+    def shuffle_singles_only(self, singles: Optional[List[Track]] = None) -> None:
         """Shuffles only standalone singles without mixing in full album tracks."""
+        if singles is None and self.library:
+            singles = self.library.singles
         self.playback_mode = PlaybackMode.SHUFFLE_SINGLES_ONLY
-        shuffled = list(singles)
+        shuffled = list(singles or [])
         random.shuffle(shuffled)
         self.set_queue(shuffled, start_index=0, auto_play=True)
 
-    def shuffle_albums(self, albums: List[Album]) -> None:
+    def shuffle_albums(self, albums: Optional[List[Album]] = None) -> None:
         """Randomizes the order of albums (sequential per album)."""
+        if albums is None and self.library:
+            albums = self.library.albums
         self.playback_mode = PlaybackMode.SHUFFLE_ALBUMS
-        album_queue = build_album_shuffle_queue(albums)
+        album_queue = build_album_shuffle_queue(albums or [])
         self.set_queue(album_queue, start_index=0, auto_play=True)
 
     def play_track_at_index(self, index: int) -> bool:
@@ -425,6 +454,12 @@ class PlayerEngine:
             return self.play_track_at_index(len(self.queue) - 1)
         return False
 
+    def next_track(self) -> bool:
+        return self.next()
+
+    def previous_track(self) -> bool:
+        return self.previous()
+
     def seek(self, position_seconds: float) -> None:
         self.backend.seek(position_seconds)
 
@@ -461,6 +496,12 @@ class PlayerEngine:
                     if dur > 0 and pos >= (dur - 1.0):
                         self.next()
 
+    def stop(self) -> None:
+        """Stop playback immediately."""
+        self.backend.stop()
+        self.is_paused = False
+
     def close(self) -> None:
         self._monitor_running = False
-        self.backend.stop()
+        self.stop()
+
