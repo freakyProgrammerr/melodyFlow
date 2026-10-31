@@ -30,6 +30,8 @@ from kivy.metrics import dp
 import ui_theme
 from library import MusicLibrary, Track, Album
 from player_engine import PlayerEngine, PygameAudioBackend, DummyAudioBackend
+from android_backend import create_audio_backend
+from android_permissions import request_android_audio_permissions, get_android_default_music_dir
 from ui_components import (
     TrackCard,
     AlbumCard,
@@ -353,6 +355,9 @@ class MelodyFlowApp(App):
     def build(self):
         Window.clearcolor = ui_theme.current_theme.bg_primary
 
+        # Request Android runtime audio permissions if running on device
+        request_android_audio_permissions()
+
         # Load or generate library
         cache_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "library_cache.json"))
         self.library = MusicLibrary()
@@ -361,11 +366,8 @@ class MelodyFlowApp(App):
         else:
             self.library = build_default_library()
 
-        # Initialize audio engine
-        try:
-            backend = PygameAudioBackend()
-        except Exception:
-            backend = DummyAudioBackend()
+        # Initialize platform-appropriate audio engine (Android MediaPlayer or Desktop Pygame)
+        backend = create_audio_backend()
 
         self.engine = PlayerEngine(backend=backend)
         self.engine.library = self.library

@@ -50,7 +50,9 @@ A personalized music player app built with **Python**, designed specifically for
 - [x] Full integration and verification suite in `test_stage2_ui.py`.
 
 ### Stage 3: Android Integration & APK Build
-- [ ] Set up background audio service (keeps playing with screen off).
-- [ ] Configure Android permissions (`READ_MEDIA_AUDIO`).
-- [ ] Package the project into an `.apk` file.
-- [ ] Transfer and install on Android phone.
+- [x] Configure native Android audio backend (`android_backend.py`) for hardware-accelerated playback with screen off.
+- [x] Configure runtime Android permissions (`READ_MEDIA_AUDIO`, `READ_EXTERNAL_STORAGE`, `WAKE_LOCK`) in `android_permissions.py`.
+- [x] Generate production Android Buildozer specification (`buildozer.spec`).
+- [ ] Run Buildozer APK compilation (`buildozer android debug`).
+- [ ] Transfer and install `.apk` on Android phone.
+
