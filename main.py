@@ -92,7 +92,7 @@ class MainRootLayout(BoxLayout):
                            padding=[dp(16), dp(8)], spacing=dp(10))
 
         # Title + Library Stats
-        title_box = BoxLayout(orientation="vertical", spacing=dp(1), size_hint=(0.7, 1))
+        title_box = BoxLayout(orientation="vertical", spacing=dp(1), size_hint=(0.65, 1))
         app_title = Label(text="MelodyFlow", font_size=dp(20), bold=True,
                           color=ui_theme.current_theme.text_primary, halign="left", valign="middle")
         title_box.bind(width=lambda _, w: setattr(app_title, 'text_size', (w, None)))
@@ -106,15 +106,15 @@ class MainRootLayout(BoxLayout):
         title_box.add_widget(self.stats_lbl)
         header.add_widget(title_box)
 
-        # Theme Cycle Button (Demonstrates 100% dynamic theme customizability)
-        btn_theme = Button(text="🎨", font_size=dp(18), size_hint=(None, 1), width=dp(42),
+        # Theme Cycle Button
+        btn_theme = Button(text="THEME", font_size=dp(11), bold=True, size_hint=(None, 1), width=dp(60),
                            background_color=(0, 0, 0, 0), color=ui_theme.current_theme.accent_secondary)
         btn_theme.bind(on_release=self._cycle_theme)
         header.add_widget(btn_theme)
 
-        # Rescan Folder Button
-        btn_scan = Button(text="📁", font_size=dp(18), size_hint=(None, 1), width=dp(42),
-                          background_color=(0, 0, 0, 0), color=ui_theme.current_theme.text_primary)
+        # Rescan Device Music Button
+        btn_scan = Button(text="SCAN", font_size=dp(11), bold=True, size_hint=(None, 1), width=dp(55),
+                          background_color=(0, 0, 0, 0), color=ui_theme.current_theme.accent_primary)
         btn_scan.bind(on_release=self._rescan_library)
         header.add_widget(btn_scan)
 
@@ -339,13 +339,70 @@ class MainRootLayout(BoxLayout):
         self.switch_tab(self.screen_manager.current)
 
     def _rescan_library(self, *args):
-        # Refresh sample or local directory
-        self.library = build_default_library()
-        self.engine.library = self.library
+        self.stats_lbl.text = "Scanning device music..."
+        Clock.schedule_once(lambda dt: self._execute_scan(), 0.05)
+
+    def _execute_scan(self):
+        new_lib = scan_device_music()
+        self.library = new_lib
+        self.engine.library = new_lib
         self._populate_tracks_screen()
         self._populate_albums_screen()
         self._populate_singles_screen()
         self.stats_lbl.text = f"{self.library.total_tracks} tracks  •  {len(self.library.albums)} albums  •  {len(self.library.singles)} singles"
+
+
+def scan_device_music(art_cache_dir=None) -> MusicLibrary:
+    """
+    Scans internal and external storage directories for supported audio files.
+    On Android, searches /storage/emulated/0/Music, Download, Audio, and SD cards.
+    On Desktop, searches local music_library/ folder.
+    """
+    from kivy.utils import platform
+    from scanner import scan_directory
+
+    dirs_to_scan = []
+    if platform == "android":
+        candidates = [
+            "/storage/emulated/0/Music",
+            "/storage/emulated/0/Download",
+            "/storage/emulated/0/Audio",
+            "/storage/emulated/0/Podcasts",
+            "/sdcard/Music",
+            "/sdcard/Download",
+        ]
+        if os.path.exists("/storage"):
+            try:
+                for entry in os.listdir("/storage"):
+                    if entry not in ("emulated", "self"):
+                        ext_dir = os.path.join("/storage", entry, "Music")
+                        if os.path.isdir(ext_dir):
+                            candidates.append(ext_dir)
+            except Exception:
+                pass
+        for d in candidates:
+            if os.path.exists(d) and os.path.isdir(d):
+                dirs_to_scan.append(d)
+    else:
+        dirs_to_scan = ["music_library"]
+
+    all_meta = []
+    for d in dirs_to_scan:
+        try:
+            results = scan_directory(d, art_cache_dir=art_cache_dir)
+            all_meta.extend(results)
+        except Exception as e:
+            print(f"[Scanner] Error scanning '{d}': {e}")
+
+    lib = MusicLibrary()
+    if all_meta:
+        lib.load_from_metadata_list(all_meta)
+    else:
+        # Fall back to default sample library if no tracks found yet
+        from sample_library_builder import build_default_library
+        lib = build_default_library()
+
+    return lib
 
 
 class MelodyFlowApp(App):
@@ -356,15 +413,23 @@ class MelodyFlowApp(App):
         Window.clearcolor = ui_theme.current_theme.bg_primary
 
         # Request Android runtime audio permissions if running on device
-        request_android_audio_permissions()
+        def on_perms(granted):
+            if granted and hasattr(self, 'root_layout'):
+                Clock.schedule_once(lambda dt: self.root_layout._rescan_library(), 0.3)
 
-        # Load or generate library
-        cache_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "library_cache.json"))
-        self.library = MusicLibrary()
-        if os.path.exists(cache_path):
-            self.library.load_cache(cache_path)
+        request_android_audio_permissions(on_complete=on_perms)
+
+        # Load or scan library
+        from kivy.utils import platform
+        if platform == "android":
+            self.library = scan_device_music()
         else:
-            self.library = build_default_library()
+            cache_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "library_cache.json"))
+            self.library = MusicLibrary()
+            if os.path.exists(cache_path):
+                self.library.load_cache(cache_path)
+            else:
+                self.library = build_default_library()
 
         # Initialize platform-appropriate audio engine (Android MediaPlayer or Desktop Pygame)
         backend = create_audio_backend()
@@ -372,7 +437,8 @@ class MelodyFlowApp(App):
         self.engine = PlayerEngine(backend=backend)
         self.engine.library = self.library
 
-        return MainRootLayout(app_instance=self)
+        self.root_layout = MainRootLayout(app_instance=self)
+        return self.root_layout
 
     def on_stop(self):
         """Clean shutdown of playback threads and audio device."""

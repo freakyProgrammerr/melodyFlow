@@ -114,7 +114,12 @@ class PygameAudioBackend(AudioBackend):
         self._pygame.mixer.music.set_volume(vol)
 
     def is_playing(self) -> bool:
-        return self._pygame.mixer.music.get_busy() and not self._is_paused
+        try:
+            if not self._pygame.mixer.get_init():
+                return False
+            return self._pygame.mixer.music.get_busy() and not self._is_paused
+        except Exception:
+            return False
 
 
 class DummyAudioBackend(AudioBackend):

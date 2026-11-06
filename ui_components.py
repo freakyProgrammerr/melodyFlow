@@ -63,32 +63,33 @@ class StyledCard(Button):
         self.col_inst.rgba = self._bg_color
 
 
-class ArtworkThumbnail(Widget):
+class ArtworkThumbnail(RelativeLayout):
     """
-    Renders album cover artwork or an elegant geometric placeholder with music glyphs.
+    Renders album cover artwork or an elegant placeholder badge.
     """
     def __init__(self, art_path: Optional[str] = None, corner_radius: float = 10.0, **kwargs):
         super().__init__(**kwargs)
         self.art_path = art_path
         self.corner_radius = corner_radius
 
-        with self.canvas:
+        with self.canvas.before:
             self.bg_color = Color(*ui_theme.current_theme.bg_secondary)
-            self.bg_rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[self.corner_radius])
-            
-            # Placeholder icon or real texture
-            self.accent_col = Color(*ui_theme.current_theme.accent_primary)
-            self.icon_circle = Ellipse(pos=(self.x + self.width * 0.25, self.y + self.height * 0.25),
-                                       size=(self.width * 0.5, self.height * 0.5))
+            self.bg_rect = RoundedRectangle(pos=(0, 0), size=self.size, radius=[self.corner_radius])
 
-        self.bind(pos=self._update_canvas, size=self._update_canvas)
+        self.bind(size=self._update_canvas)
+
+        if self.art_path and os.path.exists(self.art_path):
+            img = Image(source=self.art_path, allow_stretch=True, keep_ratio=True,
+                        pos_hint={'center_x': 0.5, 'center_y': 0.5})
+            self.add_widget(img)
+        else:
+            self.glyph_lbl = Label(text="♫", font_size=dp(18), bold=True,
+                                   color=ui_theme.current_theme.accent_primary,
+                                   pos_hint={'center_x': 0.5, 'center_y': 0.5})
+            self.add_widget(self.glyph_lbl)
 
     def _update_canvas(self, *args):
-        self.bg_rect.pos = self.pos
         self.bg_rect.size = self.size
-        cw, ch = self.width * 0.5, self.height * 0.5
-        self.icon_circle.pos = (self.x + (self.width - cw) / 2, self.y + (self.height - ch) / 2)
-        self.icon_circle.size = (cw, ch)
 
 
 class TrackCard(StyledCard):
@@ -182,8 +183,9 @@ class AlbumCard(StyledCard):
 
 class ActionPillButton(Button):
     """Modern pill button for primary actions (e.g. 'Play Album', 'Shuffle All')."""
-    def __init__(self, text: str, icon_symbol: str = "▶", is_accent: bool = True, **kwargs):
-        super().__init__(text=f"{icon_symbol}  {text}", font_size=dp(13), bold=True, **kwargs)
+    def __init__(self, text: str, icon_symbol: str = "", is_accent: bool = True, **kwargs):
+        display_text = f"{icon_symbol} {text}".strip() if icon_symbol else text
+        super().__init__(text=display_text, font_size=dp(12), bold=True, **kwargs)
         self.background_normal = ""
         self.background_down = ""
         self.background_color = (0, 0, 0, 0)
@@ -255,16 +257,16 @@ class MiniPlayer(BoxLayout):
         self.add_widget(self.info_btn)
 
         # Control Buttons (Play/Pause, Next)
-        ctrl_box = BoxLayout(orientation="horizontal", size_hint=(0.28, 1), spacing=dp(8))
+        ctrl_box = BoxLayout(orientation="horizontal", size_hint=(0.36, 1), spacing=dp(4))
         
-        self.btn_play = Button(text="▶", font_size=dp(20), bold=True,
+        self.btn_play = Button(text="PLAY", font_size=dp(11), bold=True,
                                background_color=(0, 0, 0, 0), color=ui_theme.current_theme.accent_secondary,
-                               size_hint=(0.5, 1))
+                               size_hint=(0.55, 1))
         self.btn_play.bind(on_release=self._toggle_play)
 
-        self.btn_next = Button(text="⏭", font_size=dp(18), bold=True,
+        self.btn_next = Button(text="NEXT", font_size=dp(11), bold=True,
                                background_color=(0, 0, 0, 0), color=ui_theme.current_theme.text_primary,
-                               size_hint=(0.5, 1))
+                               size_hint=(0.45, 1))
         self.btn_next.bind(on_release=self._next_track)
 
         ctrl_box.add_widget(self.btn_play)
@@ -294,11 +296,11 @@ class MiniPlayer(BoxLayout):
         if track:
             self.title_label.text = track.title
             self.artist_label.text = f"{track.artist}  •  {track.album if not track.is_single else 'Single'}"
-            self.btn_play.text = "⏸" if self.engine.is_playing else "▶"
+            self.btn_play.text = "PAUSE" if self.engine.is_playing else "PLAY"
         else:
             self.title_label.text = "No track playing"
             self.artist_label.text = "Select a song or album to play"
-            self.btn_play.text = "▶"
+            self.btn_play.text = "PLAY"
         self._update_canvas()
 
 
@@ -322,9 +324,9 @@ class NowPlayingModal(ModalView):
         # Root content layout
         root = BoxLayout(orientation="vertical", padding=[dp(20), dp(16)], spacing=dp(14))
 
-        # Header bar: Down chevron to dismiss + Title
+        # Header bar: Close button + Title
         header = BoxLayout(orientation="horizontal", size_hint=(1, None), height=dp(48))
-        btn_dismiss = Button(text="⌄", font_size=dp(32), bold=True, size_hint=(None, 1), width=dp(48),
+        btn_dismiss = Button(text="CLOSE", font_size=dp(12), bold=True, size_hint=(None, 1), width=dp(65),
                              background_color=(0, 0, 0, 0), color=ui_theme.current_theme.text_secondary)
         btn_dismiss.bind(on_release=lambda *_: self.dismiss())
         header.add_widget(btn_dismiss)
@@ -377,34 +379,32 @@ class NowPlayingModal(ModalView):
         root.add_widget(scrubber_box)
 
         # Primary Controls Row: Prev, Play/Pause, Next
-        ctrls_row = BoxLayout(orientation="horizontal", size_hint=(1, None), height=dp(68), spacing=dp(24))
-        ctrls_row.add_widget(Widget(size_hint=(0.1, 1)))
+        ctrls_row = BoxLayout(orientation="horizontal", size_hint=(1, None), height=dp(56), spacing=dp(12))
 
-        self.btn_prev = Button(text="⏮", font_size=dp(28), bold=True, size_hint=(0.25, 1),
+        self.btn_prev = Button(text="PREV", font_size=dp(13), bold=True, size_hint=(0.28, 1),
                                background_color=(0, 0, 0, 0), color=ui_theme.current_theme.text_primary)
         self.btn_prev.bind(on_release=lambda *_: self._prev())
 
-        self.btn_play_pause = ActionPillButton(text="", icon_symbol="▶", size_hint=(0.3, 1), is_accent=True)
+        self.btn_play_pause = ActionPillButton(text="PLAY", icon_symbol="", size_hint=(0.44, 1), is_accent=True)
         self.btn_play_pause.bind(on_release=lambda *_: self._toggle_play())
 
-        self.btn_next = Button(text="⏭", font_size=dp(28), bold=True, size_hint=(0.25, 1),
+        self.btn_next = Button(text="NEXT", font_size=dp(13), bold=True, size_hint=(0.28, 1),
                                background_color=(0, 0, 0, 0), color=ui_theme.current_theme.text_primary)
         self.btn_next.bind(on_release=lambda *_: self._next())
 
         ctrls_row.add_widget(self.btn_prev)
         ctrls_row.add_widget(self.btn_play_pause)
         ctrls_row.add_widget(self.btn_next)
-        ctrls_row.add_widget(Widget(size_hint=(0.1, 1)))
         root.add_widget(ctrls_row)
 
         # Secondary Controls Row: Repeat Mode & Shuffle Mode Indicator
-        sec_row = BoxLayout(orientation="horizontal", size_hint=(1, None), height=dp(42), spacing=dp(12))
-        self.btn_repeat = Button(text="🔁 ALL", font_size=dp(12), bold=True, size_hint=(0.5, 1),
+        sec_row = BoxLayout(orientation="horizontal", size_hint=(1, None), height=dp(42), spacing=dp(10))
+        self.btn_repeat = Button(text="REPEAT: ALL", font_size=dp(11), bold=True, size_hint=(0.5, 1),
                                  background_color=(0, 0, 0, 0), color=ui_theme.current_theme.text_secondary)
         self.btn_repeat.bind(on_release=self._cycle_repeat)
         sec_row.add_widget(self.btn_repeat)
 
-        self.btn_shuffle_mode = Button(text="🔀 SHUFFLE ALL", font_size=dp(12), bold=True, size_hint=(0.5, 1),
+        self.btn_shuffle_mode = Button(text="SHUFFLE ALL", font_size=dp(11), bold=True, size_hint=(0.5, 1),
                                        background_color=(0, 0, 0, 0), color=ui_theme.current_theme.accent_secondary)
         self.btn_shuffle_mode.bind(on_release=self._cycle_shuffle)
         sec_row.add_widget(self.btn_shuffle_mode)
@@ -425,17 +425,17 @@ class NowPlayingModal(ModalView):
             self.artist_lbl.text = f"{track.artist}  •  {track.album if not track.is_single else 'Single'}"
             self.seek_slider.max = track.duration if track.duration > 0 else 100
             self.lbl_time_tot.text = track.formatted_duration
-            self.btn_play_pause.text = "⏸" if self.engine.is_playing else "▶"
+            self.btn_play_pause.text = "PAUSE" if self.engine.is_playing else "PLAY"
             self.mode_badge.text = self.engine.playback_mode.value.replace("_", " ").upper()
             self._update_repeat_label()
         else:
             self.title_lbl.text = "Select a track to play"
             self.artist_lbl.text = ""
-            self.btn_play_pause.text = "▶"
+            self.btn_play_pause.text = "PLAY"
 
     def _update_repeat_label(self):
         rep = self.engine.repeat_mode.value.upper()
-        self.btn_repeat.text = f"🔁 REPEAT: {rep}"
+        self.btn_repeat.text = f"REPEAT: {rep}"
 
     def _cycle_repeat(self, *args):
         from player_engine import RepeatMode
@@ -503,7 +503,7 @@ class AlbumDetailModal(ModalView):
 
         # Header back button
         header = BoxLayout(orientation="horizontal", size_hint=(1, None), height=dp(44))
-        btn_back = Button(text="← Back", font_size=dp(16), bold=True, size_hint=(None, 1), width=dp(80),
+        btn_back = Button(text="< BACK", font_size=dp(13), bold=True, size_hint=(None, 1), width=dp(75),
                           background_color=(0, 0, 0, 0), color=ui_theme.current_theme.text_secondary)
         btn_back.bind(on_release=lambda *_: self.dismiss())
         header.add_widget(btn_back)
@@ -532,9 +532,9 @@ class AlbumDetailModal(ModalView):
 
         # Action Buttons Row
         actions_row = BoxLayout(orientation="horizontal", size_hint=(1, None), height=dp(44), spacing=dp(12))
-        btn_play_album = ActionPillButton(text="Play Album", icon_symbol="▶", size_hint=(0.5, 1), is_accent=True)
+        btn_play_album = ActionPillButton(text="PLAY ALBUM", icon_symbol="", size_hint=(0.5, 1), is_accent=True)
         btn_play_album.bind(on_release=lambda *_: self._play_album())
-        btn_shuffle_album = ActionPillButton(text="Shuffle", icon_symbol="🔀", size_hint=(0.5, 1), is_accent=False)
+        btn_shuffle_album = ActionPillButton(text="SHUFFLE", icon_symbol="", size_hint=(0.5, 1), is_accent=False)
         btn_shuffle_album.bind(on_release=lambda *_: self._shuffle_album())
         actions_row.add_widget(btn_play_album)
         actions_row.add_widget(btn_shuffle_album)
