@@ -6,7 +6,7 @@ __pycache__/
 .cache/
 .test_cache.json
 test_audio_samples/
-*.apk
-buildozer.spec
+# Build artifacts
 .buildozer/
 bin/
+*.apk
