@@ -18,8 +18,8 @@ def request_android_audio_permissions(on_complete=None) -> None:
         return
 
     try:
-        from android.permissions import request_permissions, Permission
-        from android import api_version
+        from android.permissions import request_permissions, Permission  # type: ignore[import-not-found, import-untyped]
+        from android import api_version  # type: ignore[import-not-found, import-untyped]
 
         # Android 13+ (API 33+) requires READ_MEDIA_AUDIO
         # Older versions require READ_EXTERNAL_STORAGE

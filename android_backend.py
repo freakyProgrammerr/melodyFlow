@@ -13,7 +13,14 @@ class AndroidMediaPlayerBackend(AudioBackend):
     Provides battery-efficient playback and continues playing with screen locked.
     """
     def __init__(self):
-        from jnius import autoclass
+        try:
+            from jnius import autoclass  # type: ignore[import-not-found, import-untyped]
+        except ImportError as exc:
+            raise RuntimeError(
+                "PyJNIus (jnius) is only available in the Android runtime environment. "
+                "On desktop, MelodyFlow uses PygameAudioBackend."
+            ) from exc
+
         self.MediaPlayer = autoclass('android.media.MediaPlayer')
         self.AudioManager = autoclass('android.media.AudioManager')
         self.player = self.MediaPlayer()
