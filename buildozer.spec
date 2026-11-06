@@ -55,7 +55,7 @@ android.private_storage = True
 # android.add_jars = foo.jar
 
 # (list) Android architectures to build for (arm64-v8a is modern standard)
-android.archs = arm64-v8a, armeabi-v7a
+android.archs = arm64-v8a
 
 # (bool) Copy library instead of making a libpymodules.so
 android.copy_libs = 1
